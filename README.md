@@ -13,6 +13,13 @@ Nested sets/intervals are good if you need to sort in preorder at DB-level.
 If you don't need that give a look to https://github.com/stefankroes/ancestry ,
 that implements a simpler encoding model (variant of materialized path).  
 
+The original version of this gem is at https://github.com/clyfe/acts_as_nested_interval of Nicolae Claudius.
+
+## Modification
+ 
+The modification includes:
+  - Remove specific syntax of Ruby 1.9 and make it work in JRuby and Ruby 1.8.x.
+  - Add the options :children_dependent so that we can optionally select the dependency between the parent node and its children nodes.
 
 ## Install
 
@@ -93,6 +100,29 @@ australia.parent       # => oceania
 new_zealand.ancestors  # => [earth, oceania]
 Region.roots           # => [earth]
 ```
+
+More options:
+
+```ruby
+class Country < ActiveRecord::Base
+  has_many :regions, :dependent => :destroy
+end
+
+class Region < ActiveRecord::Base 
+  acts_as_nested_interval(
+    # An array of columns to scope independent trees.
+    :scope_columns => [:country_id],
+    
+    # This option will not create a root node, but use a 'virtual root' instead.
+    :virtual_root => true,
+    
+    # Dependency between the parent node and children nodes (default :restrict).
+    :children_dependent => :destroy
+  )
+end
+```
+
+Please note that the options `:scope_columns` should always goes along with `:virtual_root => true` to make sure each scope (e.g `Country`) will have a separated root node. Otherwise, we will get some unexpected error because the root node was shared among trees.
 
 ## How it works
 
