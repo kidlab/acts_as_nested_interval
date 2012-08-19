@@ -18,11 +18,11 @@ module ActsAsNestedInterval
           
       # recompute intervals with a recursive lambda
       clear_cache!
-      update_subtree = lambda(node){
+      update_subtree = lambda do |node| 
         node.create_nested_interval
         node.save
         node.class.unscoped.where(nested_interval_foreign_key => node.id).find_each &update_subtree
-      }
+      end
       unscoped.roots.find_each &update_subtree
 
       # revert changes
