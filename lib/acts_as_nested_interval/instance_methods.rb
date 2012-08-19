@@ -166,7 +166,11 @@ module ActsAsNestedInterval
         p, q = (x * p - 1) / q, x
         sqls << "lftq = #{q} AND lftp = #{p}"
       end
-      nested_interval_scope.where(sqls * ' OR ')
+      unless sqls.blank?
+        nested_interval_scope.where(sqls * ' OR ')
+      else
+        nested_interval_scope.limit(0)
+      end
     end
 
     # Returns depth by counting ancestors up to 0 / 1.
