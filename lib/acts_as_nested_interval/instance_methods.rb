@@ -69,7 +69,7 @@ module ActsAsNestedInterval
     
     def set_nested_interval_for_top
       if self.class.virtual_root
-        set_nested_interval *next_root_lft
+        set_nested_interval(*next_root_lft)
       else
         set_nested_interval 0, 1
       end
@@ -100,27 +100,33 @@ module ActsAsNestedInterval
     # Updates record, updating descendants if parent association updated,
     # in which case caller should first acquire table lock.
     def update_nested_interval
-      if read_attribute(nested_interval_foreign_key).nil?
-        set_nested_interval_for_top
-      elsif !association(:parent).updated?
+      changed = send(:"#{nested_interval_foreign_key}_changed?")
+      if !changed
         db_self = self.class.find(id, :lock => true)
         write_attribute(nested_interval_foreign_key, db_self.read_attribute(nested_interval_foreign_key))
         set_nested_interval db_self.lftp, db_self.lftq
-      else # move
+      else
         # No locking in this case -- caller should have acquired table lock.
         update_nested_interval_move
       end
     end
     
     def update_nested_interval_move
-      db_self = self.class.find(id)
-      db_parent = self.class.find(read_attribute(nested_interval_foreign_key))
-      if db_self.ancestor_of?(db_parent)
-        errors.add nested_interval_foreign_key, "is descendant"
-        raise ActiveRecord::RecordInvalid, self
+      begin
+        db_self = self.class.find(id)
+        db_parent = self.class.find(read_attribute(nested_interval_foreign_key))
+        if db_self.ancestor_of?(db_parent)
+          errors.add nested_interval_foreign_key, "is descendant"
+          raise ActiveRecord::RecordInvalid, self
+        end
+      rescue ActiveRecord::RecordNotFound => e # root
       end
       
-      set_nested_interval *parent.next_child_lft
+      if read_attribute(nested_interval_foreign_key).nil? # root move
+        set_nested_interval_for_top
+      else # child move
+        set_nested_interval *parent.next_child_lft
+      end
       mysql_tmp = "@" if ["MySQL", "Mysql2"].include?(connection.adapter_name)
       cpp = db_self.lftq * rgtp - db_self.rgtq * lftp
       cpq = db_self.rgtp * lftp - db_self.lftp * rgtp
