@@ -159,18 +159,14 @@ module ActsAsNestedInterval
     end
 
     def ancestors
-      sqls = []
+      sqls = ['0 = 1']
       p, q = lftp, lftq
       while p != 0
         x = p.inverse(q)
         p, q = (x * p - 1) / q, x
         sqls << "lftq = #{q} AND lftp = #{p}"
       end
-      unless sqls.blank?
-        nested_interval_scope.where(sqls * ' OR ')
-      else
-        nested_interval_scope.limit(0)
-      end
+      nested_interval_scope.where(sqls * ' OR ')
     end
 
     # Returns depth by counting ancestors up to 0 / 1.
