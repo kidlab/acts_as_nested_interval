@@ -21,7 +21,7 @@ The original version of this gem is at https://github.com/clyfe/acts_as_nested_i
  
 The modification includes:
   - Remove specific syntax of Ruby 1.9 and make it work in JRuby and Ruby 1.8.x.
-  - Add the options :children_dependent so that we can optionally select the dependency between the parent node and its children nodes.
+  - Add the options :dependent so that we can optionally select the dependency between the parent node and its children nodes.
 
 ## Install
 
@@ -119,7 +119,7 @@ class Region < ActiveRecord::Base
     :virtual_root => true,
     
     # Dependency between the parent node and children nodes (default :restrict).
-    :children_dependent => :destroy
+    :dependent => :destroy
   )
 end
 ```
