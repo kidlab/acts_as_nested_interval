@@ -127,28 +127,33 @@ module ActsAsNestedInterval
       else # child move
         set_nested_interval *parent.next_child_lft
       end
-      mysql_tmp = "@" if ["MySQL", "Mysql2"].include?(connection.adapter_name)
       cpp = db_self.lftq * rgtp - db_self.rgtq * lftp
       cpq = db_self.rgtp * lftp - db_self.lftp * rgtp
       cqp = db_self.lftq * rgtq - db_self.rgtq * lftq
       cqq = db_self.rgtp * lftq - db_self.lftp * rgtq
-      
-      db_descendants = db_self.descendants
-      
+
+      updates = {}
+      vars = Set.new
+      mysql = ["MySQL", "Mysql2"].include?(connection.adapter_name)
+      var = ->(v) { mysql ? vars.add?(v) ? "(@#{v} := #{v})" : "@#{v}" : v }
+      multiply = ->(c, b) { "#{c} * #{var.(b)}" }
+      add = ->(a, b) { "#{a} + #{b}" }
+      one = sprintf("%#.30f", 1)
+      divide = ->(p, q) { "#{one} * (#{p}) / (#{q})" }
+
       if has_attribute?(:rgtp) && has_attribute?(:rgtq)
-        db_descendants.update_all %(
-          rgtp = #{cpp} * rgtp + #{cpq} * rgtq,
-          rgtq = #{cqp} * #{mysql_tmp}rgtp + #{cqq} * rgtq
-        ), mysql_tmp && %(@rgtp := rgtp)
-        db_descendants.update_all "rgt = 1.0 * rgtp / rgtq" if has_attribute?(:rgt)
+        updates[:rgtp] = -> { add.(multiply.(cpp, :rgtp), multiply.(cpq, :rgtq)) }
+        updates[:rgtq] = -> { add.(multiply.(cqp, :rgtp), multiply.(cqq, :rgtq)) }
+        updates[:rgt] = -> { divide.(updates[:rgtp].(), updates[:rgtq].()) } if has_attribute?(:rgt)
       end
-      
-      db_descendants.update_all %(
-        lftp = #{cpp} * lftp + #{cpq} * lftq,
-        lftq = #{cqp} * #{mysql_tmp}lftp + #{cqq} * lftq
-      ), mysql_tmp && %(@lftp := lftp)
-      
-      db_descendants.update_all %(lft = 1.0 * lftp / lftq) if has_attribute?(:lft)
+
+      updates[:lftp] = -> { add.(multiply.(cpp, :lftp), multiply.(cpq, :lftq)) }
+      updates[:lftq] = -> { add.(multiply.(cqp, :lftp), multiply.(cqq, :lftq)) }
+      updates[:lft] = -> { divide.(updates[:lftp].(), updates[:lftq].()) } if has_attribute?(:lft)
+
+      sql = updates.map { |k, v| "#{k} = #{v.()}" }.join(', ')
+
+      db_self.descendants.update_all sql
     end
     
     def ancestor_of?(node)

@@ -1,10 +1,6 @@
-[![Build Status](https://secure.travis-ci.org/clyfe/acts_as_nested_interval.png)](http://travis-ci.org/clyfe/acts_as_nested_interval)
-
-# ActsAsNestedInterval
+# ActsAsNestedInterval [![Build Status](https://secure.travis-ci.org/clyfe/acts_as_nested_interval.png)](http://travis-ci.org/clyfe/acts_as_nested_interval)
 
 ## About
-
-Pythonic's acts_as_nested_interval updated to Rails 3 and gemified.
 
 This act implements a nested-interval tree.  
 You can find all descendants or all ancestors with just one select query.  
@@ -14,6 +10,9 @@ a full table update (compared to nested set, where at insert, half the table is 
 Nested sets/intervals are good if you need to sort in preorder at DB-level.  
 If you don't need that give a look to https://github.com/stefankroes/ancestry ,
 that implements a simpler encoding model (variant of materialized path).  
+
+If your database supports recursive queryes (`WITH RECURSIVE`) or specific custom extensions
+(`CONNECT BY`, ltree) and you don't need portability, you're probably better off using those.
 
 The original version of this gem is at https://github.com/clyfe/acts_as_nested_interval of Nicolae Claudius.
 
@@ -45,13 +44,13 @@ Example:
 ```ruby
 create_table :regions do |t|
   t.integer :parent_id
-  t.integer :lftp, :null => false
-  t.integer :lftq, :null => false
-  t.integer :rgtp, :null => false
-  t.integer :rgtq, :null => false
-  t.float :lft, :null => false
-  t.float :rgt, :null => false
-  t.string :name, :null => false
+  t.integer :lftp, null: false
+  t.integer :lftq, null: false
+  t.integer :rgtp, null: false
+  t.integer :rgtq, null: false
+  t.decimal :lft, precision: 31, scale: 30, null: false
+  t.decimal :rgt, precision: 31, scale: 30, null: false
+  t.string :name, null: false
 end
 add_index :regions, :parent_id
 add_index :regions, :lftp
@@ -173,8 +172,8 @@ where x is the inverse of lftp modulo lftq.
 
 ## Moving nodes
 
-To move a record from `old.lftp, old.lftq` to `new.lftp, new.lftq`, apply this
-linear transform to lftp, lftq of all descendants:
+To move a record from `old.lftp, old.lftq` to `new.lftp, new.lftq`,
+the following linear transform is applied to lftp, lftq of all descendants:
 
     lftp := (old.lftq * new.rgtp - old.rgtq * new.lftp) * lftp
              + (old.rgtp * new.lftp - old.lftp * new.rgtp) * lftq
@@ -187,15 +186,17 @@ Example:
 
 ```ruby
 pacific = Region.create :name => "Pacific", :parent => earth
+ActiveRecord::Base.connection.execute("LOCK TABLES regions WRITE")
 oceania.parent = pacific
 oceania.save!
+ActiveRecord::Base.connection.execute("UNLOCK TABLES")
 ```
 
 ## Migrating from acts_as_tree
 
 If you come from acts_as_tree or another system where you only have a parent_id,
-to rebuild the intervals based on `acts_as_nested_set`, after you migrated the DB
-and created the columns required by `acts_as_nested_set` run:
+to rebuild the intervals based on `acts_as_nested_interval`, after you migrated the DB
+and created the columns required by `acts_as_nested_interval` run:
 
 ```ruby
 Region.rebuild_nested_interval_tree!
@@ -208,6 +209,10 @@ This might change once the AR identity_map is finished.
 
 ## Authors
 
-This: https://github.com/clyfe/acts_as_nested_interval  
-Original: https://github.com/pythonic/acts_as_nested_interval
 Acknowledgement: http://arxiv.org/html/cs.DB/0401014 by Vadim Tropashko.  
+
+https://github.com/pythonic  
+https://github.com/klobuczek  
+https://github.com/clyfe  
+https://github.com/quangquach  
+https://github.com/kidlab  
